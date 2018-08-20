@@ -5,9 +5,7 @@ extern crate egg_mode;
 extern crate failure;
 extern crate tokio_core;
 
-// TODO: Good error messages when env isn't correct
 // TODO: Warning about not using this for anything
-// TODO: MIT license?
 // TODO: Write Readme - Why do this? Is this serious? Okay, but is it?
 
 // twitter connection inspired by hello: https://github.com/hello-rust/hello
