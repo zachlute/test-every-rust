@@ -141,7 +141,11 @@ fn build_tweet(tweet : egg_mode::tweet::Tweet) -> Result<(), String> {
     fs::write(TEST_FILE, program).expect("Unable to write program to file.");
 
     let output = Command::new("rustc")
-        .args(&["-A", "dead_code", "-A", "non_camel_case_types", TEST_FILE, "-o", TEST_EXE])
+        .args(&["-A", "dead_code",
+                "-A", "non_camel_case_types",
+                "--crate-type=lib",
+                TEST_FILE,
+                "-o", TEST_EXE])
         .output()
         .expect("Failed to execute rustc");
 
