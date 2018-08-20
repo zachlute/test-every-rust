@@ -62,6 +62,8 @@ fn main() {
     let mut pass_count = 0;
     let mut fail_count = 0;
 
+    let mut failures = Vec::new();
+
     if let Some(tweet_id) = matches.value_of("TWEET_ID") {
         if let Ok(tweet_id) = tweet_id.parse::<u64>() {
             println!("Running 1 test");
@@ -84,13 +86,13 @@ fn main() {
                 }
             }
 
-            match build_tweet(tweet) {
+            match build_tweet(&tweet) {
                 Ok(_) => {
                     pass_count += 1;
                 },
                 Err(e) => {
                     fail_count += 1;
-                    println!("{}", e);
+                    failures.push((tweet.id, e));
                 }
             } 
         } else {
@@ -111,31 +113,47 @@ fn main() {
                 // so we subtract one, because otherwise we'll get
                 // the oldest back in the next query.
                 oldest_id = Some(tweet.id - 1);
-                match build_tweet(tweet) {
+                
+                match build_tweet(&tweet) {
                     Ok(_) => {
                         pass_count += 1;
                     },
                     Err(e) => {
                         fail_count += 1;
-                        println!("{}", e);
+                        failures.push((tweet.id, e));
                     }
                 }
             }
         }
     }
 
-    fs::remove_file(TEST_FILE).expect("Could not delete test file.");
-    fs::remove_file(TEST_EXE).expect("Could not delete test executable.");
+    if !failures.is_empty() {
+        println!("\nfailures:\n");
 
-    if Path::new(TEST_PDB).exists() {
-        fs::remove_file(TEST_PDB).expect("Could not delete test pdb.");
+        for f in &failures {
+            println!("---- {} stderr ----", f.0);
+            println!("{}", f.1);
+        }
+
+        println!("failures:");
+
+        for f in &failures {
+            println!("    {}", f.0);
+        }
     }
 
     let result = if fail_count > 0 { "FAILED".red() } else { "SUCCESS".green() };
     println!("\ntest result: {}. {} passed; {} failed", result, pass_count, fail_count);
+    
+    fs::remove_file(TEST_FILE).expect("Could not delete test file.");
+    //fs::remove_file(TEST_EXE).expect("Could not delete test executable.");
+
+    if Path::new(TEST_PDB).exists() {
+        fs::remove_file(TEST_PDB).expect("Could not delete test pdb.");
+    }
 }
 
-fn build_tweet(tweet : egg_mode::tweet::Tweet) -> Result<(), String> {
+fn build_tweet(tweet : & egg_mode::tweet::Tweet) -> Result<(), String> {
     let program = tweet.text.replace("&amp;", "&");
     print!("test {} ({})... ", tweet.id, tweet.created_at);
     fs::write(TEST_FILE, program).expect("Unable to write program to file.");
@@ -143,6 +161,7 @@ fn build_tweet(tweet : egg_mode::tweet::Tweet) -> Result<(), String> {
     let output = Command::new("rustc")
         .args(&["-A", "dead_code",
                 "-A", "non_camel_case_types",
+                "-A", "const_err",
                 "--crate-type=lib",
                 TEST_FILE,
                 "-o", TEST_EXE])
