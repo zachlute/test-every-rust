@@ -97,18 +97,28 @@ fn main() {
             panic!("Invalid Tweet ID: {}", tweet_id);
         }  
     } else {
-        let count = 5;
-        let feed = client.get_latest_tweets(count).expect("Could not retrieve tweets.");
-        
-        println!("Running {} tests", count);
-        for tweet in feed {
-            match build_tweet(tweet) {
-                Ok(_) => {
-                    pass_count += 1;
-                },
-                Err(e) => {
-                    fail_count += 1;
-                    println!("{}", e);
+        let mut oldest_id = None;
+        println!("Running all tests");
+        loop {
+            let feed = client.get_latest_tweets(oldest_id).expect("Could not retrieve tweets.");
+
+            if feed.is_empty() {
+                break;
+            }
+
+            for tweet in feed {
+                // We always want tweets older than the oldest,
+                // so we subtract one, because otherwise we'll get
+                // the oldest back in the next query.
+                oldest_id = Some(tweet.id - 1);
+                match build_tweet(tweet) {
+                    Ok(_) => {
+                        pass_count += 1;
+                    },
+                    Err(e) => {
+                        fail_count += 1;
+                        println!("{}", e);
+                    }
                 }
             }
         }
@@ -126,7 +136,7 @@ fn main() {
 }
 
 fn build_tweet(tweet : egg_mode::tweet::Tweet) -> Result<(), String> {
-    let program = tweet.text.clone();
+    let program = tweet.text.replace("&amp;", "&");
     print!("test {} ({})... ", tweet.id, tweet.created_at);
     fs::write(TEST_FILE, program).expect("Unable to write program to file.");
 
@@ -233,13 +243,19 @@ impl Client {
         Ok(result.response)
     }
 
-    pub fn get_latest_tweets(&self, count : i32) -> Result<Vec<egg_mode::tweet::Tweet>, Error> {
+    pub fn get_latest_tweets(&self, older_than_id : Option<u64>) -> Result<Vec<egg_mode::tweet::Tweet>, Error> {
         let mut core = Core::new()?;
         let handle = core.handle();
 
-        let timeline = egg_mode::tweet::user_timeline("@everyrust", false, false, &self.credentials.token, &handle).with_page_size(count);
+        if let Some(id) = older_than_id {
+            let timeline = egg_mode::tweet::user_timeline("@everyrust", false, false, &self.credentials.token, &handle);
+            let (_, feed) = core.run(timeline.newer(Some(id)))?;
+            Ok(feed.response)
+        } else {
+            let timeline = egg_mode::tweet::user_timeline("@everyrust", false, false, &self.credentials.token, &handle);
 
-        let (_, feed) = core.run(timeline.start())?;
-        Ok(feed.response)
+            let (_, feed) = core.run(timeline.start())?;
+            Ok(feed.response)
+        }
     }
 }
