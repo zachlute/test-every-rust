@@ -53,7 +53,7 @@ fn main() {
             access_token_key,
             access_token_secret,
         ),
-        // Not registerd yet. Requires OAuth dance
+        // Not registered yet. Requires OAuth dance
         _ => Credentials::load(consumer_key, consumer_secret).expect("Could not load credentials."),
     };
 
@@ -145,9 +145,14 @@ fn main() {
     let result = if fail_count > 0 { "FAILED".red() } else { "SUCCESS".green() };
     println!("\ntest result: {}. {} passed; {} failed", result, pass_count, fail_count);
     
-    fs::remove_file(TEST_FILE).expect("Could not delete test file.");
-    //fs::remove_file(TEST_EXE).expect("Could not delete test executable.");
-
+    if Path::new(TEST_FILE).exists() {
+        fs::remove_file(TEST_FILE).expect("Could not delete test file.");
+    }
+    
+    if Path::new(TEST_EXE).exists() {
+        fs::remove_file(TEST_EXE).expect("Could not delete test executable.");
+    }
+    
     if Path::new(TEST_PDB).exists() {
         fs::remove_file(TEST_PDB).expect("Could not delete test pdb.");
     }
