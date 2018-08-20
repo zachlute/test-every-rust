@@ -4,12 +4,12 @@ A command-line tool that tests every possible Rust program...eventually.
 
 ### Why?
 
-At RustConf 2018, I was chatting with somebody about [Crater][https://github.com/rust-lang-nursery/crater]
+At RustConf 2018, I was chatting with somebody about [Crater](https://github.com/rust-lang-nursery/crater)
 and what an amazing tool it is for ensuring compatibility with language changes.
 I jokingly lamented that it couldn't test every possible Rust program.
 
-Then, on my drive home, I remembered the [Every Rust][https://twitter.com/everyrust] twitter
-where @carols10cents posts a fuzzer-generated Rust program every day. The tagline is:
+Then, on my drive home, I remembered the [Every Rust](https://twitter.com/everyrust) twitter
+where [@carols10cents](https://github.com/carols10cents/) posts a fuzzer-generated Rust program every day. The tagline is:
 
 > Will generate all possible Rust programs eventually, unless the heat death of the universe happens first.
 
@@ -63,4 +63,4 @@ Follow the instructions on the screen to save that for all subsequent requests.
 ### Shout Outs
 
 The twitter functionality herein was made possible by egg-mode, and the specific
-implmentation...erm...'borrows' heavily from [Hello][https://github.com/hello-rust/hello].
+implmentation...erm...'borrows' heavily from [Hello](https://github.com/hello-rust/hello).
