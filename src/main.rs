@@ -16,6 +16,7 @@ use clap::{Arg, App};
 use colored::*;
 use dotenv::dotenv;
 use failure::Error;
+use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::io;
@@ -61,6 +62,7 @@ fn main() {
 
     let mut pass_count = 0;
     let mut fail_count = 0;
+    let mut ignore_count = 0;
 
     let mut failures = Vec::new();
 
@@ -99,6 +101,8 @@ fn main() {
             panic!("Invalid Tweet ID: {}", tweet_id);
         }  
     } else {
+        let blacklist = get_blacklist();
+
         let mut oldest_id = None;
         println!("Running all tests");
         loop {
@@ -114,6 +118,11 @@ fn main() {
                 // the oldest back in the next query.
                 oldest_id = Some(tweet.id - 1);
                 
+                if blacklist.contains(&tweet.id) {
+                    ignore_count += 1;
+                    continue;
+                }
+
                 match build_tweet(&tweet) {
                     Ok(_) => {
                         pass_count += 1;
@@ -143,12 +152,12 @@ fn main() {
     }
 
     let result = if fail_count > 0 { "FAILED".red() } else { "SUCCESS".green() };
-    println!("\ntest result: {}. {} passed; {} failed", result, pass_count, fail_count);
+    println!("\ntest result: {}. {} passed; {} failed; {} ignored", result, pass_count, fail_count, ignore_count);
     
     if Path::new(TEST_FILE).exists() {
         fs::remove_file(TEST_FILE).expect("Could not delete test file.");
     }
-    
+
     if Path::new(TEST_EXE).exists() {
         fs::remove_file(TEST_EXE).expect("Could not delete test executable.");
     }
@@ -158,9 +167,16 @@ fn main() {
     }
 }
 
+fn get_blacklist() -> HashSet<u64> {
+    let mut result = HashSet::new();
+    result.insert(574310847759040512); // Prose tweet, not code.
+    result.insert(574285011484020736); // Prose tweet, not code.
+    result
+}
+
 fn build_tweet(tweet : & egg_mode::tweet::Tweet) -> Result<(), String> {
     let program = tweet.text.replace("&amp;", "&");
-    print!("test {} ({})... ", tweet.id, tweet.created_at);
+    print!("test {} ({}) ... ", tweet.id, tweet.created_at);
     fs::write(TEST_FILE, program).expect("Unable to write program to file.");
 
     let output = Command::new("rustc")
