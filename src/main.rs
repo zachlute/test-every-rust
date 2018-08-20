@@ -151,7 +151,7 @@ fn main() {
         }
     }
 
-    let result = if fail_count > 0 { "FAILED".red() } else { "SUCCESS".green() };
+    let result = if fail_count > 0 { "FAILED".red() } else { "ok".green() };
     println!("\ntest result: {}. {} passed; {} failed; {} ignored", result, pass_count, fail_count, ignore_count);
     
     if Path::new(TEST_FILE).exists() {
@@ -196,16 +196,6 @@ fn build_tweet(tweet : & egg_mode::tweet::Tweet) -> Result<(), String> {
         println!("{}", "FAILED".red());
         Err(String::from_utf8_lossy(output.stderr.as_slice()).to_string())
     }
-}
-
-#[test]
-pub fn test_something() {
-
-}
-
-#[test]
-pub fn test_something_else() {
-    assert!(false);
 }
 
 pub struct Credentials {
