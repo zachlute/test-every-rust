@@ -19,6 +19,7 @@ use failure::Error;
 use std::env;
 use std::fs;
 use std::io;
+use std::path::Path;
 use std::process::Command;
 use tokio_core::reactor::Core;
 
@@ -115,7 +116,10 @@ fn main() {
 
     fs::remove_file(TEST_FILE).expect("Could not delete test file.");
     fs::remove_file(TEST_EXE).expect("Could not delete test executable.");
-    fs::remove_file(TEST_PDB).expect("Could not delete test pdb.");
+
+    if Path::new(TEST_PDB).exists() {
+        fs::remove_file(TEST_PDB).expect("Could not delete test pdb.");
+    }
 
     let result = if fail_count > 0 { "FAILED".red() } else { "SUCCESS".green() };
     println!("\ntest result: {}. {} passed; {} failed", result, pass_count, fail_count);
