@@ -24,11 +24,11 @@ static TEST_FILE: &'static str = "test.rs";
 static TEST_EXE: &'static str = "test.exe";
 static TEST_PDB: &'static str = "test.pdb";
 
-fn main() -> Result<(), Error> {
+fn main() {
     dotenv().ok();
 
-    let consumer_key = env::var("TWITTER_CONSUMER_KEY")?.to_string();
-    let consumer_secret = env::var("TWITTER_CONSUMER_SECRET")?.to_string();
+    let consumer_key = env::var("TWITTER_CONSUMER_KEY").expect("TWITTER_CONSUMER_KEY not defined in environment or .env file.").to_string();
+    let consumer_secret = env::var("TWITTER_CONSUMER_SECRET").expect("TWITTER_CONSUMER_SECRET not defined in environment or .env file.").to_string();
     let credentials = match (
         env::var("TWITTER_ACCESS_KEY"),
         env::var("TWITTER_ACCESS_SECRET"),
@@ -41,13 +41,13 @@ fn main() -> Result<(), Error> {
             access_token_secret,
         ),
         // Not registerd yet. Requires OAuth dance
-        _ => Credentials::load(consumer_key, consumer_secret)?,
+        _ => Credentials::load(consumer_key, consumer_secret).expect("Could not load credentials."),
     };
 
     let client = Client::new(credentials);
 
     let count = 5;
-    let feed = client.get_tweets(count)?;
+    let feed = client.get_tweets(count).expect("Could not retrieve tweets.");
     let mut pass_count = 0;
     let mut fail_count = 0;
     println!("Running {} tests", count);
@@ -79,8 +79,6 @@ fn main() -> Result<(), Error> {
 
     let result = if fail_count > 0 { "FAILED".red() } else { "SUCCESS".green() };
     println!("\ntest result: {}. {} passed; {} failed", result, pass_count, fail_count);
-
-    Ok(())
 }
 
 #[test]
