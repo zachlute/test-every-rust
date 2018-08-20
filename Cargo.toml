@@ -1,0 +1,11 @@
+[package]
+name = "test-every-rust"
+version = "0.1.0"
+authors = ["Zach Lute <zach.lute@gmail.com>"]
+
+[dependencies]
+colored = "1.6.1"
+dotenv = "0.13.0"
+egg-mode = "0.12.0"
+failure = "0.1.2"
+tokio-core = "0.1"
