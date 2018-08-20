@@ -5,11 +5,6 @@ extern crate egg_mode;
 extern crate failure;
 extern crate tokio_core;
 
-// TODO: Warning about not using this for anything
-// TODO: Write Readme - Why do this? Is this serious? Okay, but is it?
-
-// twitter connection inspired by hello: https://github.com/hello-rust/hello
-
 use clap::{Arg, App};
 use colored::*;
 use dotenv::dotenv;
