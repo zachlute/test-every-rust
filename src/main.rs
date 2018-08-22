@@ -17,9 +17,7 @@ use std::path::Path;
 use std::process::Command;
 use tokio_core::reactor::Core;
 
-static TEST_FILE: &'static str = "test.rs";
-static TEST_EXE: &'static str = "test.exe";
-static TEST_PDB: &'static str = "test.pdb";
+static OUTPUT_DIR: &str = "./output";
 
 fn main() {
     dotenv().ok();
@@ -63,6 +61,8 @@ fn main() {
     let mut ignore_count = 0;
 
     let mut failures = Vec::new();
+
+    fs::create_dir(OUTPUT_DIR).expect("Could not create output directory.");
 
     if let Some(tweet_id) = matches.value_of("TWEET_ID") {
         if let Ok(tweet_id) = tweet_id.parse::<u64>() {
@@ -163,17 +163,7 @@ fn main() {
         result, pass_count, fail_count, ignore_count
     );
 
-    if Path::new(TEST_FILE).exists() {
-        fs::remove_file(TEST_FILE).expect("Could not delete test file.");
-    }
-
-    if Path::new(TEST_EXE).exists() {
-        fs::remove_file(TEST_EXE).expect("Could not delete test executable.");
-    }
-
-    if Path::new(TEST_PDB).exists() {
-        fs::remove_file(TEST_PDB).expect("Could not delete test pdb.");
-    }
+    fs::remove_dir_all(OUTPUT_DIR).expect("Could not remove output directory.");
 }
 
 fn get_blacklist() -> HashSet<u64> {
@@ -186,7 +176,12 @@ fn get_blacklist() -> HashSet<u64> {
 fn build_tweet(tweet: &egg_mode::tweet::Tweet) -> Result<(), String> {
     let program = tweet.text.replace("&amp;", "&");
     print!("test {} ({}) ... ", tweet.id, tweet.created_at);
-    fs::write(TEST_FILE, program).expect("Unable to write program to file.");
+
+    let test_file = format!("{}/{}.rs", OUTPUT_DIR, tweet.id);
+    let test_output = format!("{}/{}.output", OUTPUT_DIR, tweet.id);
+    let test_pdb = format!("{}/{}.pdb", OUTPUT_DIR, tweet.id);
+
+    fs::write(&test_file, program).expect("Unable to write program to file.");
 
     let output = Command::new("rustc")
         .args(&[
@@ -197,11 +192,23 @@ fn build_tweet(tweet: &egg_mode::tweet::Tweet) -> Result<(), String> {
             "-A",
             "const_err",
             "--crate-type=lib",
-            TEST_FILE,
+            &test_file,
             "-o",
-            TEST_EXE,
+            &test_output,
         ]).output()
         .expect("Failed to execute rustc");
+
+    if Path::new(&test_file).exists() {
+        fs::remove_file(test_file).expect("Could not delete test file.");
+    }
+
+    if Path::new(&test_output).exists() {
+        fs::remove_file(test_output).expect("Could not delete test executable.");
+    }
+
+    if Path::new(&test_pdb).exists() {
+        fs::remove_file(test_pdb).expect("Could not delete test pdb.");
+    }
 
     if output.status.success() {
         println!("{}", "ok".green());
