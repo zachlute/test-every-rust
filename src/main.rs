@@ -72,7 +72,7 @@ fn main() {
                 .get_tweet(tweet_id)
                 .expect("Could not retrieve tweet.");
 
-            match tweet.user.clone() {
+            match &tweet.user {
                 Some(user) => {
                     match user.screen_name.as_ref() {
                         "everyrust" => {
