@@ -104,7 +104,12 @@ fn main() {
         let blacklist = get_blacklist();
 
         let mut oldest_id = None;
-        println!("Running all tests");
+
+        let count = client.get_tweet_count().expect("Could not retrieve tweet count.");
+
+        // The count isnt exact because it includes retweets if any exist.
+        println!("Running ~{} tests", count); 
+        
         loop {
             let feed = client
                 .get_latest_tweets(oldest_id)
@@ -296,6 +301,16 @@ impl Client {
         let result = core.run(tweet)?;
 
         Ok(result.response)
+    }
+
+    pub fn get_tweet_count(&self) -> Result<i32, Error> {
+        let mut core = Core::new()?;
+        let handle = core.handle();
+
+        let user = egg_mode::user::show("@everyrust", &self.credentials.token, &handle);
+        let result = core.run(user)?;
+
+        Ok(result.response.statuses_count)
     }
 
     pub fn get_latest_tweets(
