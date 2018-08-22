@@ -62,6 +62,9 @@ fn main() {
 
     let mut failures = Vec::new();
 
+    if Path::new(OUTPUT_DIR).exists() {
+        fs::remove_dir_all(OUTPUT_DIR).expect("Could not remove output directory.");
+    }
     fs::create_dir(OUTPUT_DIR).expect("Could not create output directory.");
 
     if let Some(tweet_id) = matches.value_of("TWEET_ID") {
