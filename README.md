@@ -25,7 +25,7 @@ some new APIs. It's not *actually* intended to test every Rust program ever made
 
 ### Should I run this thing?
 
-Almost certainly not. And definitely not without a sandboxed environment. It downlods
+Almost certainly not. And definitely not without a sandboxed environment. It downloads
 and builds arbitrary code from the internet. Let's not be ridiculous.
 
 And while Test Every Rust doesn't actually RUN that code, just builds it, uh...still,
