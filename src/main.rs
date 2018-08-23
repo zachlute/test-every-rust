@@ -104,7 +104,7 @@ fn main() {
             panic!("Invalid Tweet ID: {}", tweet_id);
         }
     } else {
-        let blacklist = get_blacklist();
+        let ignore_list = get_ignore_list();
 
         let mut oldest_id = None;
 
@@ -128,7 +128,7 @@ fn main() {
                 // the oldest back in the next query.
                 oldest_id = Some(tweet.id - 1);
 
-                if blacklist.contains(&tweet.id) {
+                if ignore_list.contains(&tweet.id) {
                     ignore_count += 1;
                     continue;
                 }
@@ -174,7 +174,7 @@ fn main() {
     fs::remove_dir_all(OUTPUT_DIR).expect("Could not remove output directory.");
 }
 
-fn get_blacklist() -> HashSet<u64> {
+fn get_ignore_list() -> HashSet<u64> {
     let mut result = HashSet::new();
     result.insert(574310847759040512); // Prose tweet, not code.
     result.insert(574285011484020736); // Prose tweet, not code.
