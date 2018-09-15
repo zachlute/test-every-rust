@@ -1,5 +1,6 @@
 extern crate clap;
 extern crate colored;
+extern crate ctrlc;
 extern crate dotenv;
 extern crate egg_mode;
 extern crate failure;
@@ -15,9 +16,12 @@ use std::fs;
 use std::io;
 use std::path::Path;
 use std::process::Command;
+use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio_core::reactor::Core;
 
 static OUTPUT_DIR: &str = "./output";
+static STATUS_CONTROL_C_EXIT: i32 = -1073741510;
 
 fn main() {
     dotenv().ok();
@@ -56,20 +60,21 @@ fn main() {
 
     let client = Client::new(credentials);
 
-    let mut pass_count = 0;
-    let mut fail_count = 0;
-    let mut ignore_count = 0;
-
-    let mut failures = Vec::new();
+    let results = Arc::new(Mutex::new(ResultData::new()));
 
     if Path::new(OUTPUT_DIR).exists() {
         fs::remove_dir_all(OUTPUT_DIR).expect("Could not remove output directory.");
     }
     fs::create_dir(OUTPUT_DIR).expect("Could not create output directory.");
 
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let finished = Arc::new(AtomicBool::new(false));
+
     if let Some(tweet_id) = matches.value_of("TWEET_ID") {
         if let Ok(tweet_id) = tweet_id.parse::<u64>() {
             println!("Running 1 test");
+
+            results.lock().unwrap().total_count = 1;
 
             let tweet = client
                 .get_tweet(tweet_id)
@@ -91,28 +96,41 @@ fn main() {
                 }
             }
 
-            match build_tweet(&tweet) {
+            match build_tweet(&tweet, None) {
                 Ok(_) => {
-                    pass_count += 1;
+                    results.lock().unwrap().pass_count += 1;
                 }
                 Err(e) => {
-                    fail_count += 1;
-                    failures.push((tweet.id, e));
+                    let mut r = results.lock().unwrap();
+                    r.fail_count += 1;
+                    r.failures.push((tweet.id, e));
                 }
             }
         } else {
             panic!("Invalid Tweet ID: {}", tweet_id);
         }
     } else {
+        // Install a Ctrl+C handler so we can gracefully exist.
+        let ctrlc_cancelled = Arc::clone(&cancelled);
+        let ctrlc_finished = Arc::clone(&finished);
+        ctrlc::set_handler(move || {
+            // Mark us cancelled.
+            ctrlc_cancelled.store(true, Ordering::SeqCst);
+
+            // Wait for the other thread to stop.
+            while !ctrlc_finished.load(Ordering::SeqCst) {}
+        }).expect("Error setting Ctrl-C handler");
+
         let ignore_list = get_ignore_list();
 
         let mut oldest_id = None;
 
         let count = client.get_tweet_count().expect("Could not retrieve tweet count.");
+        results.lock().unwrap().total_count = count;
 
         // The count isnt exact because it includes retweets if any exist.
         println!("Running ~{} tests", count); 
-        
+
         loop {
             let feed = client
                 .get_latest_tweets(oldest_id)
@@ -129,49 +147,100 @@ fn main() {
                 oldest_id = Some(tweet.id - 1);
 
                 if ignore_list.contains(&tweet.id) {
-                    ignore_count += 1;
+                    results.lock().unwrap().ignore_count += 1;
                     continue;
                 }
 
-                match build_tweet(&tweet) {
+                match build_tweet(&tweet, Some(&cancelled)) {
                     Ok(_) => {
-                        pass_count += 1;
+                        results.lock().unwrap().pass_count += 1;
                     }
                     Err(e) => {
-                        fail_count += 1;
-                        failures.push((tweet.id, e));
+                        let mut r = results.lock().unwrap();
+                        r.fail_count += 1;
+                        r.failures.push((tweet.id, e));
                     }
                 }
+
+                if cancelled.load(Ordering::SeqCst) {
+                    // We've been terminated. Stop doing things.
+                    break;
+                }
+            }
+
+            if cancelled.load(Ordering::SeqCst) {
+                // We've been terminated. Stop doing things.
+                break;
             }
         }
     }
 
-    if !failures.is_empty() {
+    print_results(&results.lock().unwrap(), cancelled.load(Ordering::SeqCst));
+
+    cleanup();
+
+    // Mark us finished.
+    finished.store(true, Ordering::SeqCst);
+}
+
+struct ResultData {
+    failures: Vec<(u64, String)>,
+    pass_count: i32,
+    fail_count: i32,
+    ignore_count: i32,
+    total_count: i32,
+}
+
+impl ResultData {
+    pub fn new() -> ResultData {
+        ResultData {
+            failures: Vec::new(),
+            pass_count: 0,
+            fail_count: 0,
+            ignore_count: 0,
+            total_count: 0,
+        }
+    }
+}
+
+fn cleanup () {
+    fs::remove_dir_all(OUTPUT_DIR).expect("Could not remove output directory.");
+}
+
+fn print_results (results: &ResultData, cancelled: bool) {
+    if !results.failures.is_empty() {
         println!("\nfailures:\n");
 
-        for f in &failures {
+        for f in &results.failures {
             println!("---- {} stderr ----", f.0);
             println!("{}", f.1);
         }
 
         println!("failures:");
 
-        for f in &failures {
+        for f in &results.failures {
             println!("    {}", f.0);
         }
     }
 
-    let result = if fail_count > 0 {
+    let aggregate_result = if results.fail_count > 0 {
         "FAILED".red()
+    } else if cancelled {
+        "ABORTED".yellow()
     } else {
         "ok".green()
     };
-    println!(
+
+    print!(
         "\ntest result: {}. {} passed; {} failed; {} ignored",
-        result, pass_count, fail_count, ignore_count
+        aggregate_result, results.pass_count, results.fail_count, results.ignore_count
     );
 
-    fs::remove_dir_all(OUTPUT_DIR).expect("Could not remove output directory.");
+    if cancelled {
+        println!("; {} aborted", results.total_count - results.pass_count - results.fail_count - results.ignore_count);
+    } else {
+        println!();
+    }
 }
 
 fn get_ignore_list() -> HashSet<u64> {
@@ -181,7 +250,7 @@ fn get_ignore_list() -> HashSet<u64> {
     result
 }
 
-fn build_tweet(tweet: &egg_mode::tweet::Tweet) -> Result<(), String> {
+fn build_tweet(tweet: &egg_mode::tweet::Tweet, cancelled: Option<& Arc<AtomicBool>>) -> Result<(), String> {
     let program = tweet.text.replace("&amp;", "&");
     print!("test {} ({}) ... ", tweet.id, tweet.created_at);
 
@@ -216,6 +285,20 @@ fn build_tweet(tweet: &egg_mode::tweet::Tweet) -> Result<(), String> {
 
     if Path::new(&test_pdb).exists() {
         fs::remove_file(test_pdb).expect("Could not delete test pdb.");
+    }
+
+    if let Some(cancelled) = cancelled {
+        if cancelled.load(Ordering::SeqCst) {
+            println!("ABORTED");
+            return Ok(());
+        }
+    }
+
+    if let Some(code) = output.status.code() {
+        if code == STATUS_CONTROL_C_EXIT {
+            println!("{}", "ABORTED".yellow());
+            return Err("ABORTED!".to_string())
+        }
     }
 
     if output.status.success() {
